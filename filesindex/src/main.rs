@@ -39,6 +39,14 @@ fn init_storage(env_var: &str) -> Result<Box<dyn Storage>> {
     let storage_type = parts[0];
     let path = PathBuf::from(parts[1]);
 
+    // Виправлення багу #4
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            std::fs::create_dir_all(parent)
+                .context("Failed to create parent directories for the database")?;
+        }
+    }
+
     match storage_type {
         "json" => Ok(Box::new(JsonStorage::new(path)?)),
         "sqlite" => Ok(Box::new(SqliteStorage::new(path)?)),
@@ -58,10 +66,14 @@ fn main() -> Result<()> {
 
     match cli.command {
         Commands::Add { path, tags } => {
-            storage.add_file(path, tags)?;
+            // Виправлення багу #5
+            let cleaned_tags = tags.into_iter().map(|t| t.trim().to_string()).collect();
+            storage.add_file(path, cleaned_tags)?;
         }
         Commands::Get { tags } => {
-            let files = storage.get_files(tags)?;
+            // Виправлення багу #5
+            let cleaned_tags = tags.into_iter().map(|t| t.trim().to_string()).collect();
+            let files = storage.get_files(cleaned_tags)?;
             for file in files {
                 println!("{}", file);
             }
